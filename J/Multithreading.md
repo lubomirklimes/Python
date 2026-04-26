@@ -12,37 +12,30 @@ Kvůli GIL vlákna obvykle nezrychlují čistě CPU-bound Python výpočty.
 
 ```python
 import threading
-from pathlib import Path
+import time
 from queue import Queue
-import tempfile
 
 
-def worker(path: Path, out: Queue[str]) -> None:
-    # Reálný I/O workload: čtení souboru z disku
-    content = path.read_text(encoding="utf-8")
-    out.put(f"{path.name}: {len(content)} znaků")
+def worker(name: str, out: Queue[str]) -> None:
+    # Simulace I/O čekání
+    time.sleep(0.4)
+    out.put(f"{name} hotovo")
 
 
 result_queue: Queue[str] = Queue()
+threads = [threading.Thread(target=worker, args=(f"t{i}", result_queue)) for i in range(4)]
 
-with tempfile.TemporaryDirectory() as tmpdir:
-    base = Path(tmpdir)
-    files = []
-    for i in range(4):
-        p = base / f"input_{i}.txt"
-        p.write_text((f"Soubor {i}\\n" * 10_000), encoding="utf-8")
-        files.append(p)
+start = time.perf_counter()
+for t in threads:
+    t.start()
+for t in threads:
+    t.join()
 
-    threads = [threading.Thread(target=worker, args=(p, result_queue)) for p in files]
-
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
-
-    results = [result_queue.get() for _ in threads]
+elapsed = time.perf_counter() - start
+results = [result_queue.get() for _ in threads]
 
 print(results)
+print(f"Celkový čas: {elapsed:.3f}s")
 ```
 
 ## 3. When to use
